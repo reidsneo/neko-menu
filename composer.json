@@ -1,0 +1,17 @@
+{
+    "name": "neko/menu",
+    "description": "neko microframework menu builder",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Reids",
+            "email": "reids@neoblackant.org"
+        }
+    ],
+    "autoload": {
+        "psr-4": {
+            "Neko\\Menu\\": "src/"
+        }
+    },
+    "minimum-stability": "dev"
+}
