@@ -19,4 +19,14 @@ class Arr
 
         return $array;
     }
+
+    public static function mapToAssoc(array $items, callable $callback)
+    {
+        return array_reduce($items, function (array $assoc, $item) use ($callback) {
+            [$key, $value] = $callback($item);
+            $assoc[$key] = $value;
+
+            return $assoc;
+        }, []);
+    }
 }

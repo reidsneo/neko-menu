@@ -77,4 +77,24 @@ class Link implements Item, HasHtmlAttributes, HasParentAttributes, Activatable
     {
         return $this->render();
     }
+
+    public function getUrl(): string
+    {
+        return $this->url;
+    }
+
+    public function isActive(): bool
+    {
+        return $this->active;
+    }
+
+    public function getPrepend()
+    {
+        return $this->prepend;
+    }
+
+    public function struct()
+    {
+        return array("title"=>getTagspan($this->text()),"url"=>$this->getUrl());
+    }
 }

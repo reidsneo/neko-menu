@@ -68,4 +68,12 @@ class Html implements Item, Activatable, HasParentAttributes
     {
         return $this->html;
     }
+
+    /**
+     * @return string
+     */
+    public function struct()
+    {
+        return $this->html;
+    }
 }

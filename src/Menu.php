@@ -57,6 +57,8 @@ class Menu implements Item, Countable, HasHtmlAttributes, HasParentAttributes, I
 
         $this->htmlAttributes = new Attributes();
         $this->parentAttributes = new Attributes();
+        $this->breadcrumb = array();
+        $this->subcrumb = array();
     }
 
     /**
@@ -391,6 +393,36 @@ class Menu implements Item, Countable, HasHtmlAttributes, HasParentAttributes, I
         }
 
         return false;
+    }
+
+    public function checkSubBreadCrumb($link)
+    {
+        if (method_exists($link, 'each')) {
+            $link->each(function ($sublink){
+                if (method_exists($sublink, 'each')) {
+                    $this->subcrumb[] = getTagspan($sublink->prepend);
+                }
+                if($sublink->isActive())
+                {
+                    self::checkSubBreadCrumb($sublink);
+                }        
+            });
+        }else{
+            $this->subcrumb[] = getTagspan($link->text());
+        }
+        
+        return $this->subcrumb;
+    }
+
+    public function getBreadCrumb(): array
+    {
+        foreach ($this->items as $item) {
+            if ($item->isActive()) {
+                $this->breadcrumb[] = getTagspan($item->prepend);
+                $this->breadcrumb[] = self::checkSubBreadCrumb($item);
+            }
+        }
+        return array_flatten($this->breadcrumb);
     }
 
     /**
@@ -764,5 +796,25 @@ class Menu implements Item, Countable, HasHtmlAttributes, HasParentAttributes, I
     public function getIterator(): Traversable
     {
         return new ArrayIterator($this->items);
+    }
+    
+    public function struct()
+    {
+        return $this->getStruct();
+    }
+
+    protected function mapItem(Item $item)
+    {
+        if (method_exists($item, 'text')) {
+            //echo getTagspan($item->text());
+        }
+        return $item->struct();
+    }
+    
+    public function getStruct()
+    {
+        $contents = array_map([$this, 'mapItem'], $this->items);
+        $contents = array_merge(array(getTagspan($this->prepend)),$contents);
+        return $contents;
     }
 }

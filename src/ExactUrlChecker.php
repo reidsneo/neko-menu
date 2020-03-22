@@ -2,7 +2,7 @@
 
 namespace Neko\Menu;
 
-use Neko\Url\Url;
+use Neko\Menu\Url;
 use Neko\Menu\Helpers\Str;
 
 class ExactUrlChecker
