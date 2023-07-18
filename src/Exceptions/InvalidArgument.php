@@ -1,6 +1,6 @@
 <?php
 
-namespace Neko\Menu\Url\Exceptions;
+namespace Neko\Menu\Exceptions;
 
 use InvalidArgumentException;
 

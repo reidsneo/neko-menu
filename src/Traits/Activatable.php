@@ -2,7 +2,6 @@
 
 namespace Neko\Menu\Traits;
 
-use Neko\Url\Url;
 use Neko\Menu\ExactUrlChecker;
 use Neko\Menu\ActiveUrlChecker;
 

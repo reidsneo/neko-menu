@@ -3,15 +3,19 @@
 namespace Neko\Menu;
 
 use Neko\Menu\Html\Attributes;
-use Neko\Menu\Traits\Conditions as ConditionsTrait;
 use Neko\Menu\Traits\Activatable as ActivatableTrait;
-use Neko\Menu\Traits\HasTextAttributes as HasAttributesTrait;
+use Neko\Menu\Traits\Conditions as ConditionsTrait;
 use Neko\Menu\Traits\HasHtmlAttributes as HasHtmlAttributesTrait;
 use Neko\Menu\Traits\HasParentAttributes as HasParentAttributesTrait;
+use Neko\Menu\Traits\HasTextAttributes as HasAttributesTrait;
 
 class Link implements Item, HasHtmlAttributes, HasParentAttributes, Activatable
 {
-    use ActivatableTrait, HasHtmlAttributesTrait, HasParentAttributesTrait, ConditionsTrait, HasAttributesTrait;
+    use ActivatableTrait;
+    use HasHtmlAttributesTrait;
+    use HasParentAttributesTrait;
+    use ConditionsTrait;
+    use HasAttributesTrait;
 
     /** @var string */
     protected $text;
@@ -20,13 +24,17 @@ class Link implements Item, HasHtmlAttributes, HasParentAttributes, Activatable
     protected $url = null;
 
     /** @var string */
-    protected $prepend, $append = '';
+    protected $prepend = '';
+
+    /** @var string */
+    protected $append = '';
 
     /** @var bool */
     protected $active = false;
 
     /** @var \Neko\Menu\Html\Attributes */
-    protected $htmlAttributes, $parentAttributes;
+    protected $htmlAttributes;
+    protected $parentAttributes;
 
     /**
      * @param string $url
@@ -67,7 +75,7 @@ class Link implements Item, HasHtmlAttributes, HasParentAttributes, Activatable
         $attributes = new Attributes(['href' => $this->url]);
         $attributes->mergeWith($this->htmlAttributes);
 
-        return $this->prepend."<a {$attributes}>{$this->text}</a>".$this->append;
+        return $this->renderPrepend()."<a {$attributes}>{$this->text}</a>".$this->renderAppend();
     }
 
     /**

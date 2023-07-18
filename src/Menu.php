@@ -2,21 +2,24 @@
 
 namespace Neko\Menu;
 
-use Countable;
-use Traversable;
 use ArrayIterator;
+use Countable;
 use IteratorAggregate;
-use Neko\Menu\Html\Tag;
-use Neko\Menu\Html\Attributes;
 use Neko\Menu\Helpers\Reflection;
+use Neko\Menu\Html\Attributes;
+use Neko\Menu\Html\Tag;
 use Neko\Menu\Traits\Conditions as ConditionsTrait;
-use Neko\Menu\Traits\HasTextAttributes as HasAttributesTrait;
 use Neko\Menu\Traits\HasHtmlAttributes as HasHtmlAttributesTrait;
 use Neko\Menu\Traits\HasParentAttributes as HasParentAttributesTrait;
+use Neko\Menu\Traits\HasTextAttributes as HasAttributesTrait;
+use Traversable;
 
 class Menu implements Item, Countable, HasHtmlAttributes, HasParentAttributes, IteratorAggregate
 {
-    use HasHtmlAttributesTrait, HasParentAttributesTrait, ConditionsTrait, HasAttributesTrait;
+    use HasHtmlAttributesTrait;
+    use HasParentAttributesTrait;
+    use ConditionsTrait;
+    use HasAttributesTrait;
 
     /** @var array */
     protected $items = [];
@@ -24,8 +27,11 @@ class Menu implements Item, Countable, HasHtmlAttributes, HasParentAttributes, I
     /** @var array */
     protected $filters = [];
 
-    /** @var string */
-    protected $prepend, $append = '';
+    /** @var string|Item */
+    protected $prepend = '';
+
+    /** @var string|Item */
+    protected $append = '';
 
     /** @var array */
     protected $wrap = [];
@@ -39,7 +45,7 @@ class Menu implements Item, Countable, HasHtmlAttributes, HasParentAttributes, I
     /** @var string */
     protected $wrapperTagName = 'ul';
 
-    /** @var bool */
+    /** @var string|null */
     protected $parentTagName = 'li';
 
     /** @var bool */
@@ -49,7 +55,11 @@ class Menu implements Item, Countable, HasHtmlAttributes, HasParentAttributes, I
     protected $activeClassOnLink = false;
 
     /** @var \Neko\Menu\Html\Attributes */
-    protected $htmlAttributes, $parentAttributes;
+    protected $htmlAttributes;
+    protected $parentAttributes;
+
+    protected $breadcrumb;
+    protected $subcrumb;
 
     protected function __construct(Item ...$items)
     {
@@ -226,10 +236,9 @@ class Menu implements Item, Countable, HasHtmlAttributes, HasParentAttributes, I
      */
     public function submenu($header, $menu = null)
     {
-        list($header, $menu) = $this->parseSubmenuArgs(func_get_args());
+        [$header, $menu] = $this->parseSubmenuArgs(func_get_args());
 
         $menu = $this->createSubmenuMenu($menu);
-        $header = $this->createSubmenuHeader($header);
 
         return $this->add($menu->prependIf($header, $header));
     }
@@ -392,6 +401,10 @@ class Menu implements Item, Countable, HasHtmlAttributes, HasParentAttributes, I
             }
         }
 
+        if ($this->prepend && $this->prepend instanceof Item && $this->prepend->isActive()) {
+            return true;
+        }
+
         return false;
     }
 
@@ -426,13 +439,22 @@ class Menu implements Item, Countable, HasHtmlAttributes, HasParentAttributes, I
     }
 
     /**
-     * A menu can be active but not exact-active.
+     * A menu can be active but not exact-active, unless its prepend is.
      *
      * @return bool
      */
     public function isExactActive(): bool
     {
-        return false;
+        if (! $this->prepend) {
+            return false;
+        }
+
+        // Kind of hacky, should be handled differently in the next major version
+        if (! method_exists($this->prepend, 'isExactActive')) {
+            return false;
+        }
+
+        return $this->prepend->isExactActive();
     }
 
     /**
@@ -493,6 +515,10 @@ class Menu implements Item, Countable, HasHtmlAttributes, HasParentAttributes, I
             $menu->setActiveFromUrl($url, $root);
         });
 
+        if ($this->prepend instanceof Activatable) {
+            $this->prepend->determineActiveForUrl($url, $root);
+        }
+
         $this->applyToAll(function (Activatable $item) use ($url, $root) {
             $item->determineActiveForUrl($url, $root);
         });
@@ -514,12 +540,15 @@ class Menu implements Item, Countable, HasHtmlAttributes, HasParentAttributes, I
         $type = Reflection::firstParameterType($callable);
 
         $this->applyToAll(function (Activatable $item) use ($callable, $type) {
+
+            /** @var \Neko\Menu\Activatable|\Neko\Menu\Item $item */
             if (! Reflection::itemMatchesType($item, $type)) {
                 return;
             }
 
             if ($callable($item)) {
                 $item->setActive();
+                /** @psalm-suppress UndefinedInterfaceMethod */
                 $item->setExactActive();
             }
         });
@@ -725,7 +754,11 @@ class Menu implements Item, Countable, HasHtmlAttributes, HasParentAttributes, I
 
         $wrappedContents = $tag ? $tag->withContents($contents) : implode('', $contents);
 
-        $menu = $this->prepend.$wrappedContents.$this->append;
+        if ($this->prepend instanceof Item && $this->prepend->isActive()) {
+            $this->prepend = $this->renderActiveClassOnLink($this->prepend);
+        }
+
+        $menu = $this->renderPrepend().$wrappedContents.$this->renderAppend();
 
         if (! empty($this->wrap)) {
             return Tag::make($this->wrap[0], new Attributes($this->wrap[1]))->withContents($menu);
@@ -750,18 +783,13 @@ class Menu implements Item, Countable, HasHtmlAttributes, HasParentAttributes, I
             if ($this->activeClassOnParent) {
                 $attributes->addClass($this->activeClass);
 
+                /** @psalm-suppress UndefinedInterfaceMethod */
                 if ($item->isExactActive()) {
                     $attributes->addClass($this->exactActiveClass);
                 }
             }
 
-            if ($this->activeClassOnLink && $item instanceof HasHtmlAttributes) {
-                $item->addClass($this->activeClass);
-
-                if ($item->isExactActive()) {
-                    $item->addClass($this->exactActiveClass);
-                }
-            }
+            $item = $this->renderActiveClassOnLink($item);
         }
 
         if ($item instanceof HasParentAttributes) {
@@ -775,6 +803,23 @@ class Menu implements Item, Countable, HasHtmlAttributes, HasParentAttributes, I
         return Tag::make($this->parentTagName, $attributes)->withContents($item->render());
     }
 
+    /**
+     * @param Item $item
+     */
+    protected function renderActiveClassOnLink(Item $item): Item
+    {
+        if ($this->activeClassOnLink && $item instanceof HasHtmlAttributes && ! $item instanceof Menu) {
+            $item->addClass($this->activeClass);
+
+            /** @psalm-suppress UndefinedInterfaceMethod */
+            if ($item->isExactActive()) {
+                $item->addClass($this->exactActiveClass);
+            }
+        }
+
+        return $item;
+    }
+    
     /**
      * The amount of items in the menu.
      *
@@ -817,4 +862,5 @@ class Menu implements Item, Countable, HasHtmlAttributes, HasParentAttributes, I
         $contents = array_merge(array(getTagspan($this->prepend)),$contents);
         return $contents;
     }
+    
 }

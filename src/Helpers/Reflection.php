@@ -2,11 +2,11 @@
 
 namespace Neko\Menu\Helpers;
 
-use ReflectionObject;
-use Neko\Menu\Item;
+use ReflectionClass;
 use ReflectionFunction;
+use ReflectionObject;
 use ReflectionParameter;
-
+use Neko\Menu\Item;
 class Reflection
 {
     public static function firstParameterType(callable $callable): string
@@ -18,7 +18,11 @@ class Reflection
         $parameters = $reflection->getParameters();
 
         $parameterTypes = array_map(function (ReflectionParameter $parameter) {
-            return $parameter->getClass() ? $parameter->getClass()->name : null;
+            $class = $parameter->getType() && ! $parameter->getType()->isBuiltin()
+                ? new ReflectionClass($parameter->getType()->getName())
+                : null;
+
+            return $class ? $class->name : null;
         }, $parameters);
 
         return $parameterTypes[0] ?? '';
